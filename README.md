@@ -1,4 +1,4 @@
-# Gamma Delta Associated Enterocolitis Analysis Scripts
+# Gamma Delta Analysis Scripts
 
 Repository containing code used to analyze single-cell RNA-seq data published in<br>
 Raw single-cell data will be available upon request <br>
