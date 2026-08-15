@@ -35,12 +35,10 @@ Raw single-cell data will be available upon request <br>
 ```
 GD-GPR15/
 ├── R Scripts/
-│   ├── 01_QC.Rmd                               # QC filtering
-│   ├── 02_Integration.Rmd                      # Batch correction
-│   ├── 03_Clustering.Rmd                       # Global clustering, annotation, condition UMAPs
-│   ├── 04_Subclustering_GD.Rmd                 # Sub-clustering workflow
-│   ├── 05_DEGs_and_GSEA_GD_Condition.Rmd       # DEGs + GSEA
-│   ├── 06_CLR_CellFreq_GD.Rmd                  # CLR cell-frequency analysis + forest plots
+│   ├── 01_QC_integration_clustering            # QC filtering, Batch correction, Global clustering, annotation
+│   ├── 02_Subclustering                  # Sub-clustering workflow
+│   ├── 03_DEGs_ GSEA_CLR_cell_frequency        # DEGs + GSEA+ CLR cell-frequency analysis + forest plots
+│   ├── 04_Figure_plots                         # Bubble plots+ Heat maps
 │   └── sessionInfo.md                          # Full R session information and package versions                     
 └── README.md
 ```
