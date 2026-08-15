@@ -1,0 +1,442 @@
+---
+title: "01_QC_integration_clustering"
+author: "Divya"
+date: "2026-08-14"
+output: html_document
+---
+
+##load required packages
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Load required packages
+library(dplyr) 
+library(Seurat) 
+library(patchwork) 
+library(ggplot2) 
+library(cowplot) 
+library(rmarkdown) 
+library(SummarizedExperiment) 
+library(htmlwidgets) 
+library(htmltools) 
+library(shiny) 
+library(openxlsx) 
+library(hdf5r) 
+library(harmony) 
+library(DT)
+library(SeuratWrappers)
+
+```
+
+
+## Assign samples
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+sampleNames <- c("IBDUC035","IBDUC111","IBDUC115","IBDUC116","IBDUC121","IBDUC125","IBDUC129","IBDUC135","IBDUC146","IBDUC151","IBDUC154","IBDUC167","IBDUC173","IBDUC245","IBDUC303","NV138","NV140","NV144","NV157","NV159","NV161","NV162")
+data_dir <- (".../IEL")
+projectName <- "IEL"
+h5_string <- ".h5"
+```
+
+
+```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Define filenames and path
+filenames <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
+
+# Create a list to store Seurat objects
+seurat_list <- list()
+
+# Loop through filenames and create Seurat objects
+for (i in 1:length(filenames)) {
+  raw_data <- Read10X_h5(filenames[i], use.names = TRUE, unique.features = TRUE)
+  seurat_obj <- CreateSeuratObject(counts = raw_data,
+                                    project = projectName,
+                                   min.cells = 3,
+                                   min.features = 200)
+# Add sample name to orig.ident
+ seurat_obj$orig.ident <- sampleNames[i]
+
+# Store in the list
+ seurat_list[[i]] <- seurat_obj
+}
+ 
+# Merge all Seurat objects into one
+combined_data <- merge(
+  x = seurat_list[[1]], 
+  y = seurat_list[-1], 
+  add.cell.ids = sampleNames)
+ 
+combined_data$sample_names <- combined_data$orig.ident
+
+```
+
+# Add conditions
+
+```{r, eval= FALSE, results = FALSE, message=FALSE, warning=FALSE}
+sample_to_group <- setNames(
+  ifelse(grepl("NV", sampleNames), "Healthy",
+         ifelse(grepl("IBD|UC", sampleNames), "UC", NA)),
+  sampleNames
+)
+# Apply the new annotations to your Seurat object
+combined_data$condition <- plyr::mapvalues(
+  combined_data$sample_names,
+   from = names(sample_to_group),
+  to = sample_to_group
+)
+
+# Check if condition has been mapped appropriately
+unique(combined_data$condition)
+unique(combined_data$sample_names)
+
+#save the raw file
+```
+
+##
+
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Standard Seurat workflow
+data <- readRDS(".../file_raw.RDS")
+
+# Standard normalisation workflow
+data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+data <- ScaleData(data, verbose = TRUE)
+
+#dimension reduction
+data <- RunPCA(data, npcs = 50, verbose = FALSE)
+
+# Check how many PCs to use
+ElbowPlot(data, ndims = 50)
+
+# Use appropriate number of PCs
+data <- RunUMAP(data, reduction = "pca", dims = 1:20)
+##save raw_UMAP_file
+```
+
+# Non-integrated Samples before QC 
+
+```{r, results = 'asis', message=FALSE, warning=FALSE}
+data <- readRDS(".../raw_UMAP.RDS")
+cat("##", "Samples", " \n")
+DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("Samples before integration and QC") + theme(legend.position = "right")
+cat(" \n \n")
+cat("##", "Condition", " \n")
+DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) +
+  ggtitle("Condition before integration and QC") +
+  theme(legend.position = "right")
+cat(" \n \n")
+
+```
+
+
+# QC: Checking mitochondrial and ribosomal gene percentages
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Check mitochondrial gene names
+gene_names <- rownames(data)
+mt_genes <- grep("^MT-", gene_names, value = TRUE)
+print(mt_genes)
+
+# Calculate mitochondrial gene percentage
+data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
+ 
+# Add new column with mitochondrial percentage information
+data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
+
+# Check ribosomal gene names
+gene_names <- rownames(data)
+rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
+print(rp_genes)
+
+# Calculate ribosomal gene percentage
+data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
+
+# Add new column with ribosomal percentage information
+data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
+
+# Save RDS with mitochondrial and ribosomal percentages
+saveRDS(data, file = paste("/Users/divyajha/Desktop/R_analysis/GDT/data_combined_raw_umap.RDS"))
+```
+
+# Plot and save integrated mitochondrial and ribosomal pct
+```{r, results = 'asis', message=FALSE, warning=FALSE}
+data <- readRDS(".../raw_UMAP.RDS")
+cat("##", "Mitochondrial %", " \n")
+DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
+VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+cat(" \n \n")
+
+cat("##", "Ribosomal %", " \n")
+DimPlot(data, reduction = "umap", group.by = "rp_label", raster = FALSE) + ggtitle ("Percentage of Ribosomal Genes")
+VlnPlot(data, features = c("percent.rp"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Ribosomal Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+cat(" \n \n")
+
+pdf(paste("../pdfs/non_integrated_mitochondrial_pct.pdf"), width=16, height=10, useDingbats = FALSE)
+DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
+VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+dev.off()
+```
+
+# Filter out cells with >20% mitochondrial gene exp and nFeature > 200 and save
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+data_filtered <- subset(data, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+
+# Save RDS post filtering
+saveRDS(data_filtered, file = paste(".../data_filtered_umap.RDS"))
+```
+
+# Read pre and post filtering RDS files to compute statistics on how many cells are being filtered
+
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+data_filtered <- readRDS(".../data_filtered_umap.RDS")
+data <- readRDS(".../raw_UMAP.RDS")
+
+# Get total and filtered cell counts 
+total_cells <- length(Cells(data))
+retained_cells <- length(Cells(data_filtered))
+filtered_cells <- total_cells - retained_cells  
+
+# Calculate percentages
+retained_percentage <- (retained_cells / total_cells) * 100
+filtered_percentage <- (filtered_cells / total_cells) * 100
+
+# Count cells with NA values in filtering columns
+na_filtered <- sum(is.na(data$nFeature_RNA) | is.na(data$percent.mt))
+
+# Count cells removed due to BOTH filters (overlap)
+overlap_filtered <- sum((data$nFeature_RNA < 200 | data$nFeature_RNA > 2500) & (data$percent.mt > 20), na.rm = TRUE)
+
+# Count cells removed for nFeature_RNA and percent.mt, adjusting for overlap
+nfeature_count <- sum(data$nFeature_RNA < 200 | data$nFeature_RNA > 2500, na.rm = TRUE) 
+mitochondrial_cells <- sum(data$percent.mt > 20, na.rm = TRUE)
+
+# Correct the total filtered count by adding NAs
+filtered_cells_corrected <- nfeature_count + mitochondrial_cells - overlap_filtered + na_filtered
+
+# Summary table
+summary_table <- data.frame(
+  "Category" = c("Total Cells", "Retained Cells", "Total Filtered Cells", "nFeature_RNA Cells", "Mitochondrial Cells"),
+  "Raw Count" = c(total_cells, retained_cells, filtered_cells, nfeature_count, mitochondrial_cells),
+  "Percentage" = c(
+    100, 
+    retained_percentage, 
+    (filtered_cells / total_cells) * 100, 
+    (nfeature_count / total_cells) * 100, 
+    (mitochondrial_cells / total_cells) * 100
+  )
+)
+
+# Format to remove scientific notation
+summary_table$Percentage <- format(summary_table$Percentage, scientific = FALSE)
+```
+
+# Cell Count Summary
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+# Display summary table
+paged_table(summary_table)
+```
+
+
+# Non-integrated Samples after mitochondrial and nFeature RNA Filtering
+```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+data_filtered <- readRDS(".../data_filtered_umap.RDS")
+cat("##", "Samples", " \n")
+DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering") + theme(legend.position = "right")
+
+cat(" \n \n")
+cat("##", "Condition", " \n")
+DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering")
+cat(" \n \n")
+```
+
+
+## Calculate cell distribution sample wise, raw counts and percentages
+
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+# Calculate cell distribution sample wise, raw counts and percentages
+
+# Load filtered dataset
+# data_filtered <- readRDS(".../data_filtered_umap.RDS")
+
+# Count number of cells per sample
+cell_counts <- table(data_filtered$sample_names)
+
+# Convert to data frame
+df_counts <- as.data.frame(cell_counts)
+colnames(df_counts) <- c("Sample", "Cell_Count")
+
+# Calculate percentage distribution (ensuring it sums to 100)
+df_counts$Percentage <- (df_counts$Cell_Count / sum(df_counts$Cell_Count)) * 100
+
+# Bar plot for percentage distribution with y-axis fixed from 0 to 100
+p1 <- ggplot(df_counts, aes(x = Sample, y = Percentage, fill = Sample)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "Cell Percentage Distribution Across Samples",
+    x = "Sample",
+    y = "Percentage of Total Cells",
+    fill = "Sample"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+# Bar plot for raw counts
+p2 <- ggplot(df_counts, aes(x = Sample, y = Cell_Count, fill = Sample)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "Raw Cell Count Distribution Across Samples",
+    x = "Sample",
+    y = "Number of Cells",
+    fill = "Sample"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+cat("##", "Raw Count Distribution", " \n")
+print(p2)
+cat ('\n \n')
+
+cat("##", "Percentage Distribution", " \n")
+print(p1)
+cat ('\n \n')
+
+# Save RDS post filtering
+saveRDS(data_filtered, file = paste(".../data_filtered_umap.RDS"))
+```
+
+# Integration of data to remove artifacts/batch effect
+
+```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+data.combined <- readRDS(".../data_filtered_umap.RDS")
+data.combined <- RunHarmony(object = data.combined, group.by.vars = "sample_names")
+# Save data
+saveRDS(data.combined, file = paste(".../data_Integrated.RDS"))
+# Run UMAP using the Harmony embeddings, not the original PCA
+data.combined <- RunUMAP(data.combined, reduction = "harmony", dims = 1:20)
+# Save integrated data
+saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
+```
+
+
+# UMAP for Samples before integration
+
+```{r,results='asis', message=FALSE, warning=FALSE}
+# Load non-integrated data
+data.bf <- readRDS(".../data_filtered_umap.RDS")
+
+DimPlot(data.bf, reduction = "umap", group.by = 'sample_names') + 
+  ggtitle('Samples before integration') + 
+  theme(legend.position = "right")
+
+# Sample wise dimplot
+sample_names <- unique(data.bf$sample_names)
+
+for (samp in sample_names) {
+  cat('##', samp, ' \n')
+  print(
+    DimPlot(
+      subset(data.bf, subset = sample_names == samp),
+      reduction = "umap",
+      label = TRUE
+    ) + ggtitle(samp)
+  )
+  cat(' \n \n')
+}
+
+```
+
+# UMAP for Samples after integration
+
+```{r,results='asis', message=FALSE, warning=FALSE}
+# Load integrated data
+# data.combined <- readRDS(".../data_Integrated_umap.RDS")
+
+## by sample names
+cat('##','All samples',' \n')
+DimPlot(data.combined, reduction = "umap", group.by= 'sample_names' ) + ggtitle('Samples after integration') + theme(legend.position = "right") 
+cat(' \n \n')
+## by condition
+DimPlot(data.combined, reduction = "umap", group.by= 'condition' ) + ggtitle('Samples after integration') + theme(legend.position = "right") 
+##extract the list of unique sample names
+sample_names_list <- unique(data.combined$sample_names)
+
+# Sample wise dimplot
+for (samp in sample_names_list) {
+  cat('##', samp, ' \n')
+  print(
+    DimPlot(
+      subset(data.combined, subset = sample_names %in% c(samp)),
+      reduction = "umap"
+    ) + ggtitle(samp)
+  )
+  cat(' \n \n')
+}
+
+# Save integrated data
+saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
+```
+
+
+###Clustering for primary clusters
+
+```{r, eval = FALSE, message = FALSE, results= FALSE, warning=FALSE}
+data.combined <- FindNeighbors(data.combined, reduction = "harmony", dims = 1:20)
+data.combined <- FindClusters(data.combined, resolution = 0.3)
+saveRDS(data.combined, file = paste(".../primary_clusters.RDS") )
+```
+
+
+##find markers for primary clusters
+
+```{r, eval = FALSE, message=FALSE, warning=FALSE}
+data.combined <- readRDS(".../primary_clusters.RDS")
+DefaultAssay(data.combined) <- "RNA"
+Idents(data.combined) <- "seurat_clusters"
+data.combined <- JoinLayers(data.combined)
+data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+# # Save markers
+write.csv(data.markers, file='.../markers_primary_clusters.csv')
+```
+
+###primary cell type annotations based on canonical markers
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+data_reannotated <- readRDS(".../primary_clusters.RDS")
+Idents(data_reannotated) <- "seurat_clusters"
+# Annotate all clusters appropriately
+cluster_annotations <- c(  "0" = "Myeloid",
+  "1" = "GDT cells",
+  "2" = "ABT cells",
+  "3" = "B cells",
+  "4" = "Epi cells",
+  "5" = "Plasma cells",
+  "6" = "Cyc cells",
+  "7" = "Myeloid",
+  "8" = "Epi cells",
+  "9" = "Epi cells",
+  "10" = "Myeloid",
+  "11" = "Epi cells",
+  "12" = "GDT cells",
+  "13" = "Mast cells",
+  "14" = "ABT/ILC cells",
+  "15" = "Stromal cells"
+)
+
+# Apply the new annotations to your Seurat object
+data_reannotated$cluster_label <- plyr::mapvalues(
+ Idents(data_reannotated),
+    from = names(cluster_annotations),
+  to = cluster_annotations
+)
+
+# Update the identities in the Seurat object
+Idents(data_reannotated) <- data_reannotated$cluster_label
+##save
+saveRDS(data_reannotated, ".../annotated_primary_clusters.RDS")
+DimPlot(data_reannotated, reduction = "umap", label.size = 12, pt.size = 0.2, repel = TRUE+ theme(legend.position = "right"),raster = FALSE)
+
+```
+
+

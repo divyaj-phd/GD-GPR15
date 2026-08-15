@@ -1,0 +1,394 @@
+---
+title: "03_DEGs_ GSEA_CLR_based_cell_frequency"
+author: "Divya"
+date: "2026-08-14"
+output: html_document
+---
+
+##load libraries
+
+```{r, results = FALSE, message = FALSE}
+# Load required libraries
+library(openxlsx)
+library(clusterProfiler)
+library(msigdbr)
+library(org.Hs.eg.db)
+library(tidyverse)
+library(readxl)
+library(rmarkdown)
+library(ggplot2)
+library(fgsea)
+library(msigdbdf)
+library(Seurat)
+library(msigdbr)
+library(dplyr)
+library(clusterProfiler)
+library(msigdbr)
+library(readr)
+library(dplyr)
+library(openxlsx)
+
+##
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(SummarizedExperiment)
+library(htmlwidgets)
+library(htmltools)
+library(shiny)
+library(openxlsx)
+library(scDblFinder)
+library(hdf5r)
+library(harmony)
+library(DT)
+library(SeuratWrappers)
+library(tidyverse)
+# library(lme4, lib.loc = "/hpc/users/pothus02/.Rlib")
+# install.packages("emmeans")
+library(emmeans)
+library(compositions)
+library(purrr)
+library(ggpubr)
+library(forcats)
+library(writexl)
+library(readxl)
+```
+
+# Condition Wise DEGs across GDT compartment
+
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Find All Markers
+subset_data <- readRDS(".../annotated_subset_clusters.RDS")
+DefaultAssay(subset_data) <- "RNA"
+Idents(subset_data) <- "condition"
+subset_data <- JoinLayers(subset_data)
+
+data.markers <- FindAllMarkers(subset_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
+
+# Save markers
+write.csv(data.markers, file='.../subset_all_markers_condition.csv')
+```
+
+###DEGs for cluster_wise_markers
+
+```{r}
+##Set Seurat clusters as identity
+DefaultAssay(gdt_subset) <- "RNA"
+gdt_subset <- JoinLayers(gdt_subset)
+Idents(gdt_subset) <- "seurat_clusters"
+
+#Find DEGs for ALL 9 clusters (vs all other cells)
+cluster_markers <- FindAllMarkers(
+gdt_subset,
+only.pos = FALSE,
+min.pct = 0.25,
+logfc.threshold = 0.25
+)
+cluster_markers$gene <- rownames(cluster_markers)
+cluster_markers <- cluster_markers[, c("gene", setdiff(colnames(cluster_markers), "gene"))]
+
+```
+
+
+```{r}
+deg_dir <- ".../seurat_cluster_DEGs"
+dir.create(deg_dir, recursive = TRUE, showWarnings = FALSE)
+cluster_list <- split(cluster_markers, cluster_markers$cluster)
+for (cl in names(cluster_list)) {
+write.csv(cluster_list[[cl]], file = file.path(deg_dir, paste0("cluster_", cl, "_DEGs.csv")), row.names = FALSE
+)
+}
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+##Build gene sets (GO + KEGG + Reactome)
+set.seed(2024)
+human_gobp_sets <- msigdbr(species = "Homo sapiens", collection = "C5", subcollection = "GO:BP")
+human_kegg_sets <- msigdbr(species = "Homo sapiens", collection = "C2", subcollection = "CP:KEGG_LEGACY")
+human_reactome_sets <- msigdbr(species = "Homo sapiens", collection = "C2", subcollection = "CP:REACTOME")
+human_gene_sets <- bind_rows(human_gobp_sets,human_kegg_sets,human_reactome_sets)
+
+####
+# Input/output directories
+deg_dir <- ".../seurat_cluster_DEGs"
+output_dir <- ".../output/"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+# TERM2GENE for clusterProfiler
+TERM2GENE <- human_gene_sets %>%
+  dplyr::select(gs_name, gene_symbol)
+
+# List all DEG files
+deg_files <- list.files(
+  deg_dir,
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+for(file in deg_files){
+
+  message("Processing: ", basename(file))
+
+  # Read DEG table
+  deg <- read.csv(file, stringsAsFactors = FALSE)
+
+  # Remove duplicate genes and missing values
+  deg <- deg %>%
+    filter(!is.na(avg_log2FC), !is.na(gene)) %>%
+    distinct(gene, .keep_all = TRUE)
+
+  # Create ranked gene list
+  geneList <- deg$avg_log2FC
+  names(geneList) <- deg$gene
+  geneList <- sort(geneList, decreasing = TRUE)
+
+  # Run GSEA
+  gsea_res <- GSEA(
+    geneList = geneList,
+    TERM2GENE = TERM2GENE,
+    minGSSize = 10,
+    maxGSSize = 500,
+    pvalueCutoff = 1,
+    pAdjustMethod = "BH",
+    verbose = FALSE
+  )
+
+  # Convert to data frame
+  gsea_df <- as.data.frame(gsea_res)
+
+  # Save to Excel
+  out_file <- file.path(
+    output_dir,
+    paste0(
+      tools::file_path_sans_ext(basename(file)),
+      "_GSEA.xlsx"
+    )
+  )
+
+  write.xlsx(
+    gsea_df,
+    file = out_file,
+    overwrite = TRUE
+  )
+
+  message("Saved: ", basename(out_file))
+}
+```
+
+####CLR based cell frequency calculations
+
+#Read RDS and generate counts
+
+```{r}
+# Read RDS
+data.clr <- readRDS(".../annotated_subset_data.RDS")
+meta <- data.clr@meta.data %>%
+  dplyr::filter(condition %in% c("UC", "Healthy")) %>% mutate(condition = fct_relevel(condition, "UC", "Healthy")) %>% as.data.frame()
+
+per_sample_counts <- meta %>%
+  dplyr::count(sample_names, cluster_label) %>%
+  group_by(sample_names) %>%
+  mutate(total_cells_sample = sum(n),
+         pct_within_sample = n / total_cells_sample * 100) %>%
+  ungroup()
+
+sample_map <- meta %>% dplyr::select(sample_names, condition) %>% distinct()
+per_sample_counts <- per_sample_counts %>%
+  left_join(sample_map, by = "sample_names")
+```
+
+#Perform CLR calculations
+
+```{r}
+# CLR
+clr_df <- per_sample_counts %>%
+  dplyr::select(sample_names, condition, cluster_label, pct_within_sample) %>%
+  pivot_wider(
+    names_from = cluster_label,
+    values_from = pct_within_sample,
+    values_fill = 0
+  )
+
+# CLR transform (samples × clusters)
+clr_mat <- clr(as.matrix(
+  clr_df %>% dplyr::select(-sample_names, -condition)
+))
+
+clr_long <- as.data.frame(clr_mat) %>%
+  mutate(
+    sample_names = clr_df$sample_names,
+    condition = clr_df$condition
+  ) %>%
+  pivot_longer(
+    cols = -c(sample_names, condition),
+    names_to = "cluster",
+    values_to = "clr_value"
+  )
+# ##sanitycheck
+# table(meta$cluster_label)
+# table(meta$condition)
+# meta$cluster_label<-paste0("GC", meta$cluster_label)
+```
+
+#ANOVA and pairwise p-values
+
+```{r}
+# Global anova and condition wise
+means_df <- clr_long %>%
+  split(.$cluster) %>%
+  map_dfr(~{
+    f <- lm(clr_value ~ condition, data = .x)
+
+    anova_p <- anova(f)["condition", "Pr(>F)"]
+    
+    em <- emmeans(
+      f,
+      pairwise ~ condition,
+      ref = "Healthy",
+      adjust = "none",
+      infer = TRUE
+    )
+
+    # em[[1]] = means
+    as.data.frame(em[[1]]) %>%
+      mutate(
+        cluster = unique(.x$cluster),
+        anova_p = anova_p
+      )
+  })
+
+diff_df <- clr_long %>%
+  split(.$cluster) %>%
+  map_dfr(~{
+    f <- lm(clr_value ~ condition, data = .x)
+
+    em <- emmeans(
+      f,
+      pairwise ~ condition,
+      ref = "Healthy",
+      adjust = "none",
+      infer = TRUE
+    )
+
+    # em[[2]] 
+    as.data.frame(em[[2]]) %>%
+      mutate(
+        cluster = unique(.x$cluster),
+        condition = gsub(" - Healthy", "", contrast)
+      )
+  })
+############
+diff_df <- diff_df %>%
+  filter(grepl("Healthy", contrast)) %>%
+  group_by(cluster) %>%
+  mutate(p.adjust = p.adjust(p.value, method = "BH")) %>%
+  ungroup() %>%
+  mutate(
+    signif = case_when(
+      p.adjust < 0.001 ~ "***",
+      p.adjust < 0.01  ~ "**",
+      p.adjust < 0.05  ~ "*",
+      TRUE ~ ""
+    )
+  ) %>%
+  mutate(
+    est_label = sprintf(
+      "%+.2f%s",   
+      estimate,
+      signif
+    )
+  ) %>%
+  # mutate(
+  #   cluster_num = as.numeric(as.character(cluster))
+  # ) %>%
+  arrange(desc(cluster)) %>%
+  mutate(
+    cluster = factor(cluster, levels = unique(cluster))
+  )
+  # ) %>%
+  # dplyr::select(-cluster)
+######
+write_xlsx(diff_df, ".../subset_UC_vs_Healthy.xlsx")
+```
+
+#Forest Plot
+
+```{r}
+# Read csv for plotting
+diff_df <- read_excel(".../subset_UC_vs_Healthy.xlsx")
+#Compact forest plot
+p <- ggplot(diff_df,
+       aes(
+         x = estimate,
+         y = cluster,
+         color = condition
+       )) +
+  geom_errorbar(
+    aes(xmin = lower.CL, xmax = upper.CL),
+    position = position_dodge(width = 0.55),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_point(
+    position = position_dodge(width = 0.55),
+    size = 2
+  ) +
+  geom_text(
+    aes(
+      x = upper.CL + 0.25,  # Move text further right
+      label = est_label,
+      group = condition
+    ),
+    position = position_dodge(width = 0.55),
+    vjust = 0.3,  # Align lower with the center of geom_point
+    size = 5,  # Maintain text size
+    color = "black",
+    show.legend = FALSE
+  ) +
+  scale_color_manual(
+    values = c(
+      "UC" = "#D4494E"
+    )
+  ) +
+  labs(
+    x = "Cluster-wise CLR differences relative to Healthy",
+    y = "Clusters",
+    color = "condition",
+    title = "Cluster-wise Counts Comparison"
+  ) +
+  scale_y_discrete(
+    expand = expansion(mult = c(0.001, 0.001))  # Further reduce whitespace
+  ) +
+  scale_x_continuous(breaks = seq(from = -100, to = 100, by = 1)) +
+  coord_cartesian(clip = "off") +  # Add padding below lines
+  theme_minimal() +
+  theme(
+    panel.spacing = unit(0, "lines"),
+    panel.spacing.y = unit(0, "lines"),
+    plot.margin = margin(5, 5, 5, 5),  # Reduce plot margins
+    axis.text.y = element_text(size = 12, color = "black"),  # Smaller y-axis text
+    axis.text.x = element_text(size = 12, color = "black"),  # Smaller x-axis tick text
+    axis.title.x = element_text(size = 14, color = "black"),  # Smaller x-axis title
+    axis.title.y = element_text(size = 14, color = "black"),  # Smaller y-axis title
+    axis.ticks = element_line(color = "black"),
+    axis.ticks.length = unit(0.15, "cm"),
+    plot.title = element_text(size = 15),  # Smaller plot title
+    legend.position = "bottom",  # Move legend to bottom
+    legend.box = "horizontal",  # Horizontal layout for legend
+    legend.key.size = unit(0.4, "cm"),  # Smaller legend keys
+    legend.text = element_text(size = 11),  # Smaller legend text
+    legend.title = element_text(size = 12),  # Match legend title size
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    axis.line = element_line(color = "black")  # Show only axis lines
+  )
+
+p <- p + theme(text = element_text(family = "sans",size = 12))
+
+print(p)
+```
+
+

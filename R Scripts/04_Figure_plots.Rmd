@@ -1,0 +1,139 @@
+---
+title: "04_Figure_plots"
+author: "Divya"
+date: "2026-08-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#library(Seurat)
+#library(ComplexHeatmap)
+#library(circlize)
+#library(grid)
+```
+
+##Heatmaps
+
+```{r}
+obj <- readRDS(.../annotated_subset_data.RDS)
+genes_select <- c("FABP1","PHGR1","TRDC","KLRC3","GPR15","RAB3GAP1","KLRC2","ATP8B4","IKZF2","TRGC2")
+genes_select <- c("GZMB","IFITM1","SPOCK2","GBP1","NFKBIA","LAG3","CCL4","GBP5","TYMP","GZMK")
+
+#avg expression matrix
+get_sample_matrix <- function(obj, genes) {
+genes <- intersect(genes, rownames(obj))
+expr <- GetAssayData(obj, layer = "data")[genes, , drop = FALSE]
+expr <- as.matrix(expr)
+samples <- obj@meta.data$sample_names
+
+# keep desired samples
+keep <- grepl("^NV|^IBDUC", samples)
+expr <- expr[, keep, drop = FALSE]
+samples <- samples[keep]
+# unique sample names
+sample_order <- unique(samples)
+# average expression per sample
+mat <- sapply(sample_order, function(s) {
+idx <- which(samples == s)
+rowMeans(expr[, idx, drop = FALSE])
+})
+
+# preserve names
+rownames(mat) <- genes
+colnames(mat) <- sample_order
+# z-score per gene
+mat_z <- t(scale(t(mat)))
+rownames(mat_z) <- genes
+colnames(mat_z) <- sample_order
+mat_z
+}
+##to check
+mat_gdt <- get_sample_matrix(obj, genes_select)
+dim(mat_gdt)
+colnames(mat_gdt)
+
+###now create heatmap
+global_max <- max(abs(mat_gdt), na.rm = TRUE)
+col_fun <- colorRamp2(
+c(-global_max, 0, global_max),
+c("darkblue", "white", "#D4494E")
+)
+###
+h_gdt <- Heatmap(
+mat_gdt,
+
+name = "z-score",
+col = col_fun,
+
+cluster_rows = FALSE,
+cluster_columns = FALSE,
+
+show_row_names = TRUE,
+show_column_names = TRUE,
+
+row_names_side = "left",
+row_names_gp = gpar(fontsize = 10),
+
+column_names_rot = 45,
+column_names_gp = gpar(fontsize = 9),
+
+column_title = "GDT_subcluster markers",
+column_title_gp = gpar(fontsize = 14, fontface = "bold"),
+
+# black borders around cells
+rect_gp = gpar(col = "black", lwd = 1),
+
+# make heatmap wider
+width = unit(ncol(mat_gdt) * 0.5, "cm"),
+
+heatmap_legend_param = list(
+title_gp = gpar(fontface = "bold"),
+labels_gp = gpar(fontsize = 9)
+)
+)
+
+draw(
+h_gdt,
+heatmap_legend_side = "right"
+)
+
+```
+
+
+### Bubble plot for specific genes across seurat clusters
+```{r}
+obj <- readRDS(".../annotated_subset_clusters.RDS")
+markers <- c(
+"IL32", "TNFRSF9", "IFNG", "AREG", "KLRF1", "LGALS4", "EPCAM", "IL17A", "TXNIP", "HLA-DRB1", "GZMK", "JUN","CD48", "KLRC3","KIR2DL4")
+
+p <- sc_bubbleplot(
+  seu = obj,
+  genes = markers,
+  group_by = "seurat_clusters",
+  groups_keep = c("0", "1", "2", "3", "4", "5", "6", "7", "8"),  
+  scale_gene = TRUE,
+  x_expand = c(0.1, 0)
+)
+
+print(p)
+
+```
+
+### Bar plots for gene expression across conditions
+
+```{r}
+p1 <- ggplot(bar_df, aes(x = factor(condition), y = mean_expr, fill = condition)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.65) +
+  geom_segment(data = brack, aes(x = xmin, xend = xmax, y = yend, yend = yend), inherit.aes = FALSE, linewidth = 0.3) +
+  geom_segment(data = brack, aes(x = xmin, xend = xmin, y = y, yend = yend), inherit.aes = FALSE, linewidth = 0.3) +
+  geom_segment(data = brack, aes(x = xmax, xend = xmax, y = y, yend = yend), inherit.aes = FALSE, linewidth = 0.3) +
+  geom_text(data = brack, aes(x = x, y = yend, label = label), inherit.aes = FALSE, size = 3, lineheight = 0.9, vjust = -0.2) +
+  scale_fill_manual(values = c("Healthy" = "#457B9D", "UC" = "#E63946")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.22))) +
+  labs(x = "condition", y = "Mean expression", fill = NULL) +
+  theme_classic(base_size = 11) +
+  theme(axis.text.x = element_text(size = 9), axis.text.y = element_text(size = 9), axis.title = element_text(size = 10), legend.position = "top", legend.key.size = unit(0.4, "cm"), legend.text = element_text(size = 9), legend.spacing.x = unit(0.2, "cm"), plot.margin = margin(6, 6, 6, 6))
+p1
+```
+
+
