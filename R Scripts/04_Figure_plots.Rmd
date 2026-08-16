@@ -6,16 +6,16 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-#library(Seurat)
-#library(ComplexHeatmap)
-#library(circlize)
-#library(grid)
+library(Seurat)
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
 ```
 
 ##Heatmaps
 
 ```{r}
-obj <- readRDS(.../annotated_subset_data.RDS)
+obj <- readRDS(".../annotated_subset_data.RDS")
 genes_select <- c("FABP1","PHGR1","TRDC","KLRC3","GPR15","RAB3GAP1","KLRC2","ATP8B4","IKZF2","TRGC2")
 genes_select <- c("GZMB","IFITM1","SPOCK2","GBP1","NFKBIA","LAG3","CCL4","GBP5","TYMP","GZMK")
 
@@ -135,5 +135,4 @@ p1 <- ggplot(bar_df, aes(x = factor(condition), y = mean_expr, fill = condition)
   theme(axis.text.x = element_text(size = 9), axis.text.y = element_text(size = 9), axis.title = element_text(size = 10), legend.position = "top", legend.key.size = unit(0.4, "cm"), legend.text = element_text(size = 9), legend.spacing.x = unit(0.2, "cm"), plot.margin = margin(6, 6, 6, 6))
 p1
 ```
-
 
