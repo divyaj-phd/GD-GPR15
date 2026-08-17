@@ -31,7 +31,7 @@ library(SeuratWrappers)
 ## Assign samples
 
 ```{r, results = FALSE, message=FALSE, warning=FALSE}
-sampleNames <- c("IBDUC035","IBDUC111","IBDUC115","IBDUC116","IBDUC121","IBDUC125","IBDUC129","IBDUC135","IBDUC146","IBDUC151","IBDUC154","IBDUC167","IBDUC173","IBDUC245","IBDUC303","NV138","NV140","NV144","NV157","NV159","NV161","NV162")
+sampleNames <- c("IBD1","IBD2","IBD3","IBD4","IBD5","IBD6","IBD7","IBD8","IBD9","IBD10","IBD11","IBD12","IBD13","IBD14","IBD15","NV1","NV2","NV3","NV4","NV5","NV6","NV7")
 data_dir <- (".../IEL")
 projectName <- "IEL"
 h5_string <- ".h5"
@@ -89,13 +89,14 @@ unique(combined_data$condition)
 unique(combined_data$sample_names)
 
 #save the raw file
+saveRDS(combined_data, "../file_raw.RDS")
 ```
 
 ##
 
 ```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
 # Standard Seurat workflow
-data <- readRDS(".../file_raw.RDS")
+data <- readRDS("../file_raw.RDS")
 
 # Standard normalisation workflow
 data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -110,13 +111,15 @@ ElbowPlot(data, ndims = 50)
 
 # Use appropriate number of PCs
 data <- RunUMAP(data, reduction = "pca", dims = 1:20)
+
 ##save raw_UMAP_file
+saveRDS(data, "../raw_UMAP.RDS")
 ```
 
 # Non-integrated Samples before QC 
 
 ```{r, results = 'asis', message=FALSE, warning=FALSE}
-data <- readRDS(".../raw_UMAP.RDS")
+data <- readRDS("../raw_UMAP.RDS")
 cat("##", "Samples", " \n")
 DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("Samples before integration and QC") + theme(legend.position = "right")
 cat(" \n \n")
@@ -177,19 +180,19 @@ VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample") + 
 dev.off()
 ```
 
-# Filter out cells with >20% mitochondrial gene exp and nFeature > 200 and save
+# Filter out cells with >20% mitochondrial gene exp and nFeature > 200 or < 2500 and save
 ```{r, results = FALSE, message=FALSE, warning=FALSE}
 data_filtered <- subset(data, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
 
 # Save RDS post filtering
-saveRDS(data_filtered, file = paste(".../data_filtered_umap.RDS"))
+saveRDS(data_filtered, file = paste("../data_filtered_umap.RDS"))
 ```
 
 # Read pre and post filtering RDS files to compute statistics on how many cells are being filtered
 
 ```{r, results=FALSE, message=FALSE, warning=FALSE}
-data_filtered <- readRDS(".../data_filtered_umap.RDS")
-data <- readRDS(".../raw_UMAP.RDS")
+data_filtered <- readRDS("../data_filtered_umap.RDS")
+data <- readRDS("../raw_UMAP.RDS")
 
 # Get total and filtered cell counts 
 total_cells <- length(Cells(data))
@@ -258,7 +261,7 @@ cat(" \n \n")
 # Calculate cell distribution sample wise, raw counts and percentages
 
 # Load filtered dataset
-# data_filtered <- readRDS(".../data_filtered_umap.RDS")
+# data_filtered <- readRDS("../data_filtered_umap.RDS")
 
 # Count number of cells per sample
 cell_counts <- table(data_filtered$sample_names)
@@ -301,22 +304,20 @@ cat ('\n \n')
 cat("##", "Percentage Distribution", " \n")
 print(p1)
 cat ('\n \n')
-
-# Save RDS post filtering
-saveRDS(data_filtered, file = paste(".../data_filtered_umap.RDS"))
 ```
 
 # Integration of data to remove artifacts/batch effect
 
 ```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
-data.combined <- readRDS(".../data_filtered_umap.RDS")
+data.combined <- readRDS("../data_filtered_umap.RDS")
 data.combined <- RunHarmony(object = data.combined, group.by.vars = "sample_names")
 # Save data
-saveRDS(data.combined, file = paste(".../data_Integrated.RDS"))
+saveRDS(data.combined, file = paste("../data_Integrated.RDS"))
+
 # Run UMAP using the Harmony embeddings, not the original PCA
 data.combined <- RunUMAP(data.combined, reduction = "harmony", dims = 1:20)
 # Save integrated data
-saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
+saveRDS(data.combined, file = paste("../data_Integrated_umap.RDS") )
 ```
 
 
@@ -324,7 +325,7 @@ saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
 
 ```{r,results='asis', message=FALSE, warning=FALSE}
 # Load non-integrated data
-data.bf <- readRDS(".../data_filtered_umap.RDS")
+data.bf <- readRDS("../data_filtered_umap.RDS")
 
 DimPlot(data.bf, reduction = "umap", group.by = 'sample_names') + 
   ggtitle('Samples before integration') + 
@@ -351,7 +352,7 @@ for (samp in sample_names) {
 
 ```{r,results='asis', message=FALSE, warning=FALSE}
 # Load integrated data
-# data.combined <- readRDS(".../data_Integrated_umap.RDS")
+# data.combined <- readRDS("../data_Integrated_umap.RDS")
 
 ## by sample names
 cat('##','All samples',' \n')
@@ -373,9 +374,6 @@ for (samp in sample_names_list) {
   )
   cat(' \n \n')
 }
-
-# Save integrated data
-saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
 ```
 
 
@@ -384,27 +382,29 @@ saveRDS(data.combined, file = paste(".../data_Integrated_umap.RDS") )
 ```{r, eval = FALSE, message = FALSE, results= FALSE, warning=FALSE}
 data.combined <- FindNeighbors(data.combined, reduction = "harmony", dims = 1:20)
 data.combined <- FindClusters(data.combined, resolution = 0.3)
-saveRDS(data.combined, file = paste(".../primary_clusters.RDS") )
+
+saveRDS(data.combined, file = paste("../primary_clusters.RDS") )
 ```
 
 
 ##find markers for primary clusters
 
 ```{r, eval = FALSE, message=FALSE, warning=FALSE}
-data.combined <- readRDS(".../primary_clusters.RDS")
+data.combined <- readRDS("../primary_clusters.RDS")
 DefaultAssay(data.combined) <- "RNA"
 Idents(data.combined) <- "seurat_clusters"
 data.combined <- JoinLayers(data.combined)
 data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
 # # Save markers
-write.csv(data.markers, file='.../markers_primary_clusters.csv')
+write.csv(data.markers, file='../markers_primary_clusters.csv')
 ```
 
 ###primary cell type annotations based on canonical markers
 
 ```{r, results = FALSE, message=FALSE, warning=FALSE}
-data_reannotated <- readRDS(".../primary_clusters.RDS")
+data_reannotated <- readRDS("../primary_clusters.RDS")
 Idents(data_reannotated) <- "seurat_clusters"
+
 # Annotate all clusters appropriately
 cluster_annotations <- c(  "0" = "Myeloid",
   "1" = "GDT cells",
@@ -424,7 +424,7 @@ cluster_annotations <- c(  "0" = "Myeloid",
   "15" = "Stromal cells"
 )
 
-# Apply the new annotations to your Seurat object
+# Apply the new annotations 
 data_reannotated$cluster_label <- plyr::mapvalues(
  Idents(data_reannotated),
     from = names(cluster_annotations),
@@ -433,8 +433,10 @@ data_reannotated$cluster_label <- plyr::mapvalues(
 
 # Update the identities in the Seurat object
 Idents(data_reannotated) <- data_reannotated$cluster_label
+
 ##save
-saveRDS(data_reannotated, ".../annotated_primary_clusters.RDS")
+saveRDS(data_reannotated, "../annotated_primary_clusters.RDS")
+
 DimPlot(data_reannotated, reduction = "umap", label.size = 12, pt.size = 0.2, repel = TRUE+ theme(legend.position = "right"),raster = FALSE)
 
 ```
