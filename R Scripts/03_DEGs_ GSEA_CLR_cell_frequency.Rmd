@@ -69,8 +69,8 @@ human_gene_sets <- bind_rows(human_gobp_sets,human_kegg_sets,human_reactome_sets
 
 ####
 # Input/output directories
-deg_dir <- ".../seurat_cluster_DEGs"
-output_dir <- ".../output/"
+deg_dir <- "../seurat_cluster_DEGs"
+output_dir <- "../output/"
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # TERM2GENE for clusterProfiler
@@ -140,9 +140,8 @@ for(file in deg_files){
 
 ```{r}
 # Read RDS
-data.clr <- readRDS(".../annotated_subset_data.RDS")
-meta <- data.clr@meta.data %>%
-  dplyr::filter(condition %in% c("UC", "Healthy")) %>% mutate(condition = fct_relevel(condition, "UC", "Healthy")) %>% as.data.frame()
+data.clr <- readRDS("../annotated_subset_data.RDS")
+meta <- data.clr@meta.data %>% mutate(condition = fct_relevel(condition, "UC", "Healthy")) %>% as.data.frame()
 
 per_sample_counts <- meta %>%
   dplyr::count(sample_names, cluster_label) %>%
@@ -267,7 +266,7 @@ diff_df <- diff_df %>%
   # ) %>%
   # dplyr::select(-cluster)
 ######
-write_xlsx(diff_df, ".../subset_UC_vs_Healthy.xlsx")
+write_xlsx(diff_df, "../subset_UC_vs_Healthy.xlsx")
 ```
 
 
