@@ -39,7 +39,7 @@ GD-GPR15/
 │   ├── 02_Subclustering                        # Sub-clustering workflow
 │   ├── 03_DEGs_ GSEA_CLR_cell_frequency        # DEGs + GSEA+ CLR cell-frequency analysis + forest plots
 │   ├── 04_Figure_plots                         # Bubble plots+ Heat maps
-│   └── sessionInfo.md                          # Full R session information and package versions                     
+│   └── sessionInfo.txt                          # Full R session information and package versions                     
 └── README.md
 ```
 
