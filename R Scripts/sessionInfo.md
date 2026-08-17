@@ -29,15 +29,15 @@ other attached packages:
 [16] org.Hs.eg.db_3.21.0         AnnotationDbi_1.70.0        msigdbr_26.1.0
 [19] clusterProfiler_4.16.0      circlize_0.4.18             ComplexHeatmap_2.24.1
 [22] SeuratWrappers_0.4.0        DT_0.34.0                   harmony_1.2.4
-[25] Rcpp_1.1.1                  hdf5r_1.3.12                scDblFinder_1.22.0
-[28] SingleCellExperiment_1.30.1 openxlsx_4.2.8.1            shiny_1.13.0
-[31] htmltools_0.5.9             htmlwidgets_1.6.4           SummarizedExperiment_1.38.1
-[34] Biobase_2.68.0              GenomicRanges_1.60.0        GenomeInfoDb_1.44.3
-[37] IRanges_2.42.0              S4Vectors_0.48.0            BiocGenerics_0.54.1
-[40] generics_0.1.4              MatrixGenerics_1.20.0       matrixStats_1.5.0
-[43] rmarkdown_2.31              cowplot_1.2.0               ggplot2_4.0.2
-[46] patchwork_1.3.2             Seurat_5.4.0                SeuratObject_5.3.0
-[49] sp_2.2-1                    dplyr_1.2.1
+[25] Rcpp_1.1.1                  hdf5r_1.3.12                SingleCellExperiment_1.30.1
+[28] openxlsx_4.2.8.1            shiny_1.13.0                htmltools_0.5.9
+[31] htmlwidgets_1.6.4           SummarizedExperiment_1.38.1 Biobase_2.68.0
+[34] GenomicRanges_1.60.0        GenomeInfoDb_1.44.3         IRanges_2.42.0
+[37] S4Vectors_0.48.0            BiocGenerics_0.54.1         generics_0.1.4
+[40] MatrixGenerics_1.20.0       matrixStats_1.5.0           rmarkdown_2.31
+[43] cowplot_1.2.0               ggplot2_4.0.2               patchwork_1.3.2
+[46] Seurat_5.4.0                SeuratObject_5.3.0          sp_2.2-1
+[49] dplyr_1.2.1
 
 loaded via a namespace (and not attached):
   [1] R.methodsS3_1.8.2        goftest_1.2-3            Biostrings_2.76.0        vctrs_0.7.2
