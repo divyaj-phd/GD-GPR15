@@ -242,10 +242,28 @@ p <- sc_bubbleplot(
 print(p)
 
 ```
-
 ### Bar plots for gene expression across conditions
 
 ```{r}
+
+genes <- c("GPR15")#GPR15#C10orf99
+data_reannotated <- readRDS("../primary_clusters.RDS")
+expr_mat <- FetchData(data_reannotated, vars = c(genes, "condition"))
+expr_long <- expr_mat %>% pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "expression")
+
+bar_df <- expr_long %>% group_by(condition, gene) %>% summarise(mean_expr = mean(expression), .groups = "drop")
+
+stat_loc <- expr_long %>% 
+  group_by(gene) %>% 
+  summarise(p = wilcox.test(expression ~ condition)$p.value, .groups = "drop") %>% 
+  mutate(p_adj = p.adjust(p, method = "BH"), 
+         stars = ifelse(p_adj < 0.001, "***", ifelse(p_adj < 0.01, "**", ifelse(p_adj < 0.05, "*", "ns"))), 
+         p_txt = ifelse(p_adj < 1e-300, "p < 1e-300", paste0("p = ", signif(p_adj, 3))), 
+         label = paste0(stars, "\n", p_txt))
+
+# bracket spans the two condition bars
+brack <- stat_loc %>% mutate(xmin = 1, xmax = 2, x = 1.5, top = max(bar_df$mean_expr), y = top * 1.06, yend = top * 1.11)
+
 p1 <- ggplot(bar_df, aes(x = factor(condition), y = mean_expr, fill = condition)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.65) +
   geom_segment(data = brack, aes(x = xmin, xend = xmax, y = yend, yend = yend), inherit.aes = FALSE, linewidth = 0.3) +
