@@ -15,9 +15,9 @@ library(grid)
 ##Heatmaps
 
 ```{r}
-obj <- readRDS(".../annotated_subset_data.RDS")
+obj <- readRDS("../annotated_subset_data.RDS")
 genes_select <- c("FABP1","PHGR1","TRDC","KLRC3","GPR15","RAB3GAP1","KLRC2","ATP8B4","IKZF2","TRGC2")
-genes_select <- c("GZMB","IFITM1","SPOCK2","GBP1","NFKBIA","LAG3","CCL4","GBP5","TYMP","GZMK")
+# genes_select <- c("GZMB","IFITM1","SPOCK2","GBP1","NFKBIA","LAG3","CCL4","GBP5","TYMP","GZMK")
 
 #avg expression matrix
 get_sample_matrix <- function(obj, genes) {
@@ -27,7 +27,7 @@ expr <- as.matrix(expr)
 samples <- obj@meta.data$sample_names
 
 # keep desired samples
-keep <- grepl("^NV|^IBDUC", samples)
+keep <- grepl("^NV|^IBD", samples)
 expr <- expr[, keep, drop = FALSE]
 samples <- samples[keep]
 # unique sample names
@@ -102,7 +102,7 @@ heatmap_legend_side = "right"
 
 ### Bubble plot for specific genes across seurat clusters
 ```{r}
-obj <- readRDS(".../annotated_subset_clusters.RDS")
+obj <- readRDS("../annotated_subset_clusters.RDS")
 markers <- c(
 "IL32", "TNFRSF9", "IFNG", "AREG", "KLRF1", "LGALS4", "EPCAM", "IL17A", "TXNIP", "HLA-DRB1", "GZMK", "JUN","CD48", "KLRC3","KIR2DL4")
 
@@ -135,11 +135,12 @@ p1 <- ggplot(bar_df, aes(x = factor(condition), y = mean_expr, fill = condition)
   theme(axis.text.x = element_text(size = 9), axis.text.y = element_text(size = 9), axis.title = element_text(size = 10), legend.position = "top", legend.key.size = unit(0.4, "cm"), legend.text = element_text(size = 9), legend.spacing.x = unit(0.2, "cm"), plot.margin = margin(6, 6, 6, 6))
 p1
 ```
-#Forest Plot
+
+#Forest Plot for CLR cell freq
 
 ```{r}
 # Read csv for plotting
-diff_df <- read_excel(".../subset_UC_vs_Healthy.xlsx")
+diff_df <- read_excel("../subset_UC_vs_Healthy.xlsx")
 #Compact forest plot
 p <- ggplot(diff_df,
        aes(
