@@ -47,7 +47,7 @@ library(readxl)
 
 ```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # Find All Markers
-subset_data <- readRDS(".../annotated_subset_clusters.RDS")
+subset_data <- readRDS("../annotated_subset_clusters.RDS")
 DefaultAssay(subset_data) <- "RNA"
 Idents(subset_data) <- "condition"
 subset_data <- JoinLayers(subset_data)
@@ -56,40 +56,8 @@ data.markers <- FindAllMarkers(subset_data, only.pos = FALSE, min.pct = 0.25, lo
 data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
 
 # Save markers
-write.csv(data.markers, file='.../subset_all_markers_condition.csv')
+write.csv(data.markers, file='../subset_all_markers_condition.csv')
 ```
-
-###DEGs for cluster_wise_markers
-
-```{r}
-##Set Seurat clusters as identity
-DefaultAssay(gdt_subset) <- "RNA"
-gdt_subset <- JoinLayers(gdt_subset)
-Idents(gdt_subset) <- "seurat_clusters"
-
-#Find DEGs for ALL 9 clusters (vs all other cells)
-cluster_markers <- FindAllMarkers(
-gdt_subset,
-only.pos = FALSE,
-min.pct = 0.25,
-logfc.threshold = 0.25
-)
-cluster_markers$gene <- rownames(cluster_markers)
-cluster_markers <- cluster_markers[, c("gene", setdiff(colnames(cluster_markers), "gene"))]
-
-```
-
-
-```{r}
-deg_dir <- ".../seurat_cluster_DEGs"
-dir.create(deg_dir, recursive = TRUE, showWarnings = FALSE)
-cluster_list <- split(cluster_markers, cluster_markers$cluster)
-for (cl in names(cluster_list)) {
-write.csv(cluster_list[[cl]], file = file.path(deg_dir, paste0("cluster_", cl, "_DEGs.csv")), row.names = FALSE
-)
-}
-```
-
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ##Build gene sets (GO + KEGG + Reactome)
