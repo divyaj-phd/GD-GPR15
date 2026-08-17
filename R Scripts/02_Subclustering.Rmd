@@ -34,33 +34,37 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 
 ```{r, results = FALSE, eval= FALSE, message=FALSE, warning=FALSE}
-data.combined <- readRDS(".../annotated_primary_clusters.RDS")
+data.combined <- readRDS("../annotated_primary_clusters.RDS")
 Idents(data.combined) <- "seurat_clusters"
 subset_data <- subset(data.combined, idents = c("1","12"))
+
 subset_data <- FindVariableFeatures(subset_data, selection.method = "vst", nfeatures = 2000)
 subset_data <- ScaleData(subset_data, verbose = FALSE)
  
 #dimension reduction
 subset_data <- RunPCA(subset_data, npcs = 50, verbose = FALSE)
-subset_data <- RunHarmony(subset_data, "sample_names")
+# Check how many PCs to use
+ElbowPlot(subset_data, ndims = 50, reduction = "pca")
 
+subset_data <- RunHarmony(subset_data, "sample_names")
 # Check how many PCs to use
 ElbowPlot(subset_data, ndims = 50, reduction = "harmony")
+
 subset_data <- RunUMAP(subset_data, reduction = "harmony", dims = 1:25)
 # Save integrated subset data
-saveRDS(subset_data, file = paste(".../subset_umap.RDS"))
+saveRDS(subset_data, file = paste("../subset_umap.RDS"))
 ```
 
 
 # Subset UMAP before clustering. Sometimes subsets need to be reintegrated. Check if this is necessary by using DimPlot with samples as well as condition
 
 ```{r,results='asis', message=FALSE, warning=FALSE}
-subset_data <- readRDS(".../subset_umap.RDS")
+subset_data <- readRDS("../subset_umap.RDS")
 DimPlot(subset_data, reduction = "umap") + ggtitle ("Subset before clustering") 
 
 # Extract counts for subset data
-data.combined <- readRDS(".../annotated_primary_clusters.RDS")
-subset_data <- readRDS(".../subset_umap.RDS")
+data.combined <- readRDS("../annotated_primary_clusters.RDS")
+subset_data <- readRDS("../subset_umap.RDS")
 
 # Get the raw count of GDT cells
 subset_count <- length(Cells(subset_data))
@@ -86,11 +90,11 @@ gdt_counts_per_condition <- meta %>%
 print(gdt_counts_per_condition)
 
 ########
-# Assuming you have your full dataset metadata
+
 meta <- data.combined@meta.data
 # Filter to keep only GDTSC cells, then count per sample
 gdt_counts_per_sample <- meta %>%
-  filter(sample_names %in% c("IBDUC-", "NV-")) %>%  # keep only those samples
+  filter(sample_names %in% c("IBD-", "NV-")) %>%  # keep only those samples
   group_by(sample_names) %>%
   summarise(GDTSC_count = n())
 print(gdt_counts_per_sample)
@@ -101,16 +105,32 @@ print(gdt_counts_per_sample)
 
 ```{r, eval = FALSE, message = FALSE, results= FALSE, warning=FALSE}
 # Do clustering
+subset_data <- FindNeighbours(subset_data)
 subset_data <- FindClusters(subset_data, resolution = 0.3)
+
 # Save clustering data
-saveRDS(subset_data, file = paste(".../subset_clusters.RDS") )
+saveRDS(subset_data, file = paste("../subset_clusters.RDS") )
 ```
+
+```{r, eval = FALSE, results = FALSE,  message=FALSE, warning=FALSE}
+# Find All Markers
+subset_data <- readRDS("../subset_clusters.RDS")
+DefaultAssay(subset_data) <- "RNA"
+Idents(subset_data) <- "seurat_clusters"
+subset_data <- JoinLayers(subset_data)
+data.markers <- FindAllMarkers(subset_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# Save markers
+write.csv(data.markers, file='../subset_data_all_markers.csv')
+```
+
 
 ###annotate the clusters of subset data and annotate subtypes
 
 ```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
-subset_data <- readRDS(".../subset_clusters.RDS")
+subset_data <- readRDS("../subset_clusters.RDS")
 Idents(subset_data) <- "seurat_clusters"
+
 # Annotate all clusters 
 cluster_annotations <- c(
 "0" = "Terminally_differentiated_GDT",
@@ -134,7 +154,9 @@ subset_data$cluster_label <- plyr::mapvalues(
 # Update the identities in the Seurat object
 Idents(subset_data) <- subset_data$cluster_label
 ###SAVE RDS
-saveRDS(subset_data, ".../annotated_subset_clusters.RDS")
+
+saveRDS(subset_data, "../annotated_subset_clusters.RDS")
+
 # Clustering UMAP
 DimPlot(subset_data, reduction = "umap", label = TRUE,label.size = 4, repel = TRUE, raster=FALSE) + ggtitle("GDT cell seurat_clusters")
 
