@@ -47,7 +47,7 @@ library(readxl)
 
 ```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # Find All Markers
-subset_data <- readRDS("../annotated_subset_clusters.RDS")
+subset_data <- readRDS("../annotated_subset_data.RDS")
 DefaultAssay(subset_data) <- "RNA"
 Idents(subset_data) <- "condition"
 subset_data <- JoinLayers(subset_data)
@@ -58,6 +58,7 @@ data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
 # Save markers
 write.csv(data.markers, file='../subset_all_markers_condition.csv')
 ```
+#Pathway enrichment analysis using GSEA
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ##Build gene sets (GO + KEGG + Reactome)
