@@ -226,7 +226,7 @@ sc_bubbleplot <- function(
 
 ### Bubble plot for specific genes across seurat clusters
 ```{r}
-obj <- readRDS("../annotated_subset_clusters.RDS")
+obj <- readRDS("../annotated_subset_data.RDS")
 markers <- c(
 "IL32", "TNFRSF9", "IFNG", "AREG", "KLRF1", "LGALS4", "EPCAM", "IL17A", "TXNIP", "HLA-DRB1", "GZMK", "JUN","CD48", "KLRC3","KIR2DL4")
 
@@ -356,7 +356,7 @@ print(p)
 ```
 ##violin plot
 ```{r}
-#readRDS <-(".../annotated_subset_data)
+#readRDS <-("../annotated_subset_data.RDS")
 Idents(subset_data) <- "seurat_clusters"
 p2 <- VlnPlot(object = subset_data,features = "GPR15",idents = c("0", "1", "2", "3", "4", "6", "7", "8"),
 pt.size = 0.5
