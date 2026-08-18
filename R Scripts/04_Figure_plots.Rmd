@@ -354,4 +354,19 @@ p <- p + theme(text = element_text(family = "sans",size = 12))
 
 print(p)
 ```
+##violin plot
+```{r}
+#readRDS <-(".../annotated_subset_data)
+Idents(subset_data) <- "seurat_clusters"
+p2 <- VlnPlot(object = subset_data,features = "GPR15",idents = c("0", "1", "2", "3", "4", "6", "7", "8"),
+pt.size = 0.5
+) +
+ggplot2::labs(
+title = "GPR15 expression across Seurat clusters",
+x = "Seurat cluster",
+y = "GPR15 expression"
+) +
+ggplot2::theme_classic()
 
+p2
+```
