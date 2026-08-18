@@ -79,16 +79,6 @@ summary_table <- data.frame(
   "Raw Count" = c(subset_count, total_cells),
   "Percentage" = c(subset_percentage, 100)
 )
-
-#########
-# Extract metadata for the subset (GDTSC cells)
-meta <- subset_data@meta.data
-# Count number of GDTSC cells per condition
-gdt_counts_per_condition <- meta %>%
-  group_by(condition) %>%
-  summarise(GDTSC_count = n())
-print(gdt_counts_per_condition)
-
 ########
 
 meta <- data.combined@meta.data
@@ -99,7 +89,6 @@ gdt_counts_per_sample <- meta %>%
   summarise(GDTSC_count = n())
 print(gdt_counts_per_sample)
 ```
-
 
 # Sub-clustering for Subset cells
 
@@ -143,7 +132,7 @@ cluster_list <- split(cluster_markers, cluster_markers$cluster)
  }
 ```
 
-###annotate the clusters of subset data and annotate subtypes
+###annotate the clusters of subset data into cell subtypes
 
 ```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
 subset_data <- readRDS("../subset_clusters.RDS")
@@ -173,7 +162,7 @@ subset_data$cluster_label <- plyr::mapvalues(
 Idents(subset_data) <- subset_data$cluster_label
 ###SAVE RDS
 
-saveRDS(subset_data, "../annotated_subset_clusters.RDS")
+saveRDS(subset_data, "../annotated_subset_data.RDS")
 
 # Clustering UMAP
 DimPlot(subset_data, reduction = "umap", label = TRUE,label.size = 4, repel = TRUE, raster=FALSE) + ggtitle("GDT cell seurat_clusters")
