@@ -37,7 +37,6 @@ projectName <- "IEL"
 h5_string <- ".h5"
 ```
 
-
 ```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
 # Define filenames and path
 filenames <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
